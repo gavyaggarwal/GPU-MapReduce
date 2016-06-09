@@ -53,3 +53,24 @@ By nature of the MapReduce model, the Mapper and Reducer have disjoint inputs an
 A less obvious candidate for parallelization is the partitioning procedure that runs between the Mapper and Reducer which aggregates all the key/value pairs produced by the mapper that share the same key so that the reducer can process all the values. To partition this, I sort the list of key/value pairs using Nvidia's `thrust` library which performs common algorithms in parallel. I use a custom comparison operation that greedily compares the bytes of the keys to determine equality.
 
 I also switched from the dynamic memory model to the fixed memory model for further speed improvements. Originally, I implemented this using a dynamic memory model where there could be a variable number of inputs, key/value pairs, and outputs, each with a variable size. However, this significantly slowed down the program due to frequent uncoalesced memory accesses and atomic operations to add new key/value pairs which essentially caused the program to run in serial. Thus, by using a fixed size for the input, output, key, and value types and setting bounds on the number of inputs, outputs, and key/value pairs per input, I was able to perform coalesced memory accesses and eliminating atomic operations by creating disjoint memory regions to write to for each thread. While this poses some constraints on the types of MapReduce jobs possible, I think the speed improvement from a fixed memory model makes this GPU-accelerated MapReduce implementation more viable.
+
+### Limitations & Further Work
+
+The primary limitations in this MapReduce implementation come from memory constraints. As mentioned before, bounds are introduced for the number of keys per input. Thus, the same amount of memory is allocated to store the key/value pairs for each input and if a mapper doesn't produce as many pairs, that memory is wasted. Also, dynamic size variables are not supported, so each element will take up as much memory as the largest element. Thus, it's easy to reach the global memory capacity of the GPU, and only so much data can be processed such that all the key/value pairs fit in the GPU global memory.
+
+This contradicts the goal of MapReduce, to process very large data sets, if we're constrained to the size of GPU global memory, usually a few GB. To get around this, we can design the program as:
+
+```
+UNTIL ALL INPUT DATA IS PROCESSED:
+    LOAD CHUNK OF INPUT DATA FROM DISK TO GPU
+    RUN MAPPER AND STORE PAIRS ON DISK
+
+GROUP ALL THE PAIRS ON DISK USING GPU
+
+UNTIL ALL GROUPS OF PAIRS IS PROCESSED:
+    LOAD CHUNK OF GROUPS FROM DISK TO GPU
+    RUN REDUCER AND STORE OUTPUT ON DISK
+```
+By using the disk to store data, we'd be able to process much larger data sets, but using the GPU to efficiently sort a large amount of data on a disk will require lots of complex IO between the disk, host memory, and GPU and is outside the scope of this project.
+
+Another limitation is that this implementation only uses 1 GPU. Greater speed can be achieved by using more GPUs if available, and a similar model as above can be used. This will also require lots of IO and synchronization in the partitioning step and is outside the scope of this project.
