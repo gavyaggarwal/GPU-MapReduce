@@ -3,7 +3,7 @@
 
 ### Inspiration
 
-After seeing the popularity of MapReduce framework used for distributed computation of large data sets, I implemented it a GPU accelerated version in Cuda.
+MapReduce is a programming model that is typically used to process large datasets on distributed clusters and is popular among large data driven companies such as Google. Today, it’s popular in the form of Hadoop, which is a Java implementation of the programming model. In MapReduce, the developer typically provides a mapper, which is a procedure that takes in a subset of the entire input data and outputs key/value pairs. Then, all the values that share the same key are aggregated and fed to another developer supplied procedure called the reducer, which produces the final output. I decided to use this model to create a framework that runs a MapReduce job on the GPU.
 
 ### How It Works?
 
@@ -16,6 +16,8 @@ In addition, users must supply a definition of a `mapper` and `reducer` function
 ### Examples
 
 I have provided two examples of MapReduce programs that use my MapReduce implementation. Note that each of these examples could be implemented directly in Cuda to obtain a more optimized version of the program, but that requires Cuda programming experience and dealing with GPU programming. With my MapReduce implementation, a user simply needs to supply the `mapper` and `reducer` functions and identify the types. Then, all of the GPU-accelerated parallel computation runs "under the hood" and doesn't require any explicit programming. I personally spent less than an hour programming each of the two examples below by using the MapReduce implementation that would otherwise take over a day if I were to write and debug the cuda code directly.
+
+To run the examples, simply `cd` into the directory for each of the samples and run `make run`.
 
 #### Uniform Random
 
@@ -48,9 +50,11 @@ Value of Pi: 3.140716
 
 ### Performance
 
-The `Uniform Random` example from above ran in 13.036s. The `Pi Estimation` example from above ran in 3.466s.
+I don't think it's suitable to compare this implementation to other MapReduce frameworks because each MapReduce methodology faces different bottlenecks and works differently. For example, Hadoop MapReduce programs are written in Java and parallelization is achieved through distributed computing. Thus, Hadoop's main bottleneck comes from network transfer and synchronization. However, this implementation is written in C++ and doesn't have network transfer. Thus, this would run much faster as C++ doesn't require a JVM and isn't subject to the large network latency and network transfer speeds.
 
-I don't really think it's suitable to compare it to other MapReduce frameworks. For example, Hadoop uses Java and parallelization is achieved through distributed computing. Thus, Hadoop's main bottleneck would be network transfer. However, this implementation is written in C++ and doesn't have network transfer so comparing the performance of this to Hadoop would be unfair.
+The `Uniform Random` example from above ran in 13.036s. The `Pi Estimation` example from above ran in 3.466s. Running this solely on the CPU takes 29.435s and 5.435s respectively. The GPU version is clearly faster, but again, I would take these numbers with a grain of salt as the speeds vary significantly on the type of CPU/GPU and I suspect a lot of the time for the GPU version comes from IO which will have less of an affect relative to the CPU version with larger data sets.
+
+Also, the speed varies significantly on the user's `Mapper` and `Reducer` function. In the two examples I gave, both of these functions are very simple, so the benefits of parallelization are small compared to when these functions require heavy computation.
 
 ### Optimizations
 
