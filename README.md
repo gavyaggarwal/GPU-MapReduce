@@ -46,13 +46,19 @@ Generating 10000000 Test Points
 Value of Pi: 3.140716
 ```
 
+### Performance
+
+The `Uniform Random` example from above ran in 13.036s. The `Pi Estimation` example from above ran in 3.466s.
+
+I don't really think it's suitable to compare it to other MapReduce frameworks. For example, Hadoop uses Java and parallelization is achieved through distributed computing. Thus, Hadoop's main bottleneck would be network transfer. However, this implementation is written in C++ and doesn't have network transfer so comparing the performance of this to Hadoop would be unfair.
+
 ### Optimizations
 
 By nature of the MapReduce model, the Mapper and Reducer have disjoint inputs and require similar computation for many inputs, so they are suitable for parallelization. Thus, instead of running the Mapper on each of inputs in serial as would happen on a single CPU machine, we can now assign an input to each core of a GPU and have thousands of cores run the Mapper simultaneously on different inputs. The Reducer works the same way, but instead of taking in an input, it takes in a range of key/value pairs that share the same key.
 
 A less obvious candidate for parallelization is the partitioning procedure that runs between the Mapper and Reducer which aggregates all the key/value pairs produced by the mapper that share the same key so that the reducer can process all the values. To partition this, I sort the list of key/value pairs using Nvidia's `thrust` library which performs common algorithms in parallel. I use a custom comparison operation that greedily compares the bytes of the keys to determine equality.
 
-I also switched from the dynamic memory model to the fixed memory model for further speed improvements. Originally, I implemented this using a dynamic memory model where there could be a variable number of inputs, key/value pairs, and outputs, each with a variable size. However, this significantly slowed down the program due to frequent uncoalesced memory accesses and atomic operations to add new key/value pairs which essentially caused the program to run in serial. Thus, by using a fixed size for the input, output, key, and value types and setting bounds on the number of inputs, outputs, and key/value pairs per input, I was able to perform coalesced memory accesses and eliminating atomic operations by creating disjoint memory regions to write to for each thread. While this poses some constraints on the types of MapReduce jobs possible, I think the speed improvement from a fixed memory model makes this GPU-accelerated MapReduce implementation more viable.
+I also switched from the dynamic memory model to the fixed memory model for further speed improvements. Originally, I implemented this using a dynamic memory model where there could be a variable number of inputs, key/value pairs, and outputs, each with a variable size. However, this significantly slowed down the program due to frequent uncoalesced memory accesses and atomic operations to add new key/value pairs which essentially caused the program to run in serial. Thus, by using a fixed size for the input, output, key, and value types and setting bounds on the number of inputs, outputs, and key/value pairs per input, I was able to perform coalesced memory accesses and eliminating atomic operations by creating disjoint memory regions to write to for each thread. While this poses some constraints on the types of MapReduce jobs possible, I think the speed improvement from a fixed memory model makes this GPU-accelerated MapReduce implementation more viable. Additionally, using the fixed memory model reduces much of the overhead required by the dynamic memory model when each of the inputs, keys, values, and outputs are small in size.
 
 ### Limitations & Further Work
 
