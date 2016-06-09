@@ -47,3 +47,7 @@ This example tests uses the Monte Carlo method to estimate the value of Pi. `NUM
 Generating 10000000 Test Points
 Value of Pi: 3.140716
 ```
+
+### Optimizations
+
+By nature of the MapReduce model, the Mapper and Reducer have disjoint inputs and require similar computation for many inputs, so they are suitable for parallelization. Thus, instead of running the Mapper on each of inputs in serial as would happen on a single CPU machine, we can now assign an input to each core of a GPU and have thousands of cores run the Mapper simultaneously on different inputs. The Reducer works the same way, but instead of taking in an input, it takes in a range of key/value pairs that share the same key.
